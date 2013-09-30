@@ -3775,10 +3775,6 @@ public class Workspace extends PagedView
                         mLauncher.processShortcutFromDrop(pendingInfo.componentName,
                                 container, screen, mTargetCell, null);
                         break;
-                    case LauncherSettings.Favorites.ITEM_TYPE_LIVE_FOLDER:
-                        mLauncher.processLiveFolderFromDrop(pendingInfo.componentName,
-                                container, screen, mTargetCell, null);
-                        break;
                     default:
                         throw new IllegalStateException("Unknown item type: " +
                                 pendingInfo.itemType);
@@ -4354,12 +4350,6 @@ public class Workspace extends PagedView
                     if ((cn != null) && packageNames.contains(cn.getPackageName())) {
                         cns.add(cn);
                     }
-                } else if (tag instanceof LiveFolderInfo) {
-                    final LiveFolderInfo info = (LiveFolderInfo) tag;
-                    final String packageName = info.receiver.getPackageName();
-                    if (packages.contains(packageName)) {
-                        cns.add(info.receiver);
-                    }
                 } else if (tag instanceof FolderInfo) {
                     FolderInfo info = (FolderInfo) tag;
                     for (ShortcutInfo s : info.contents) {
@@ -4422,13 +4412,6 @@ public class Workspace extends PagedView
                                     LauncherModel.deleteItemFromDatabase(mLauncher, info);
                                     childrenToRemove.add(view);
                                 }
-                            }
-                        } else if (tag instanceof LiveFolderInfo) {
-                            final LiveFolderInfo info = (LiveFolderInfo) tag;
-                            final ComponentName name = info.receiver;
-                            if (name != null && componentNames.contains(name)) {
-                                LauncherModel.deleteItemFromDatabase(mLauncher, info);
-                                childrenToRemove.add(view);
                             }
                         } else if (tag instanceof FolderInfo) {
                             final FolderInfo info = (FolderInfo) tag;

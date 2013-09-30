@@ -108,7 +108,6 @@ import android.widget.Toast;
 
 import com.android.common.Search;
 
-import org.cyanogenmod.support.ui.LiveFolder;
 
 import com.cyanogenmod.trebuchet.DropTarget.DragObject;
 import com.cyanogenmod.trebuchet.preference.*;
@@ -646,25 +645,6 @@ public final class Launcher extends Activity
                 break;
             case REQUEST_PICK_WALLPAPER:
                 // We just wanted the activity result here so we can clear mWaitingForResult
-                break;
-            case REQUEST_CREATE_LIVE_FOLDER:
-                if (args.intent.hasExtra(LiveFolder.Constants.FOLDER_RECEIVER_EXTRA)) {
-                    ComponentName receiver = args.intent.getParcelableExtra(
-                            LiveFolder.Constants.FOLDER_RECEIVER_EXTRA);
-                    try {
-                        // Verify that the receiver sent by the intent is from the same package
-                        if (receiver != null && getPackageManager().getReceiverInfo(receiver, 0).packageName
-                                .equals(mPendingAddInfo.componentName.getPackageName())) {
-                            completeLiveFolder(receiver, args.container, args.screen, args.cellX,
-                                    args.cellY, args.intent.getStringExtra(LiveFolder.Constants.FOLDER_TITLE_EXTRA));
-                            result = true;
-                        } else {
-                            Log.d(TAG, "Receiver not valid in returning package");
-                        }
-                    } catch (NameNotFoundException e) {
-                        e.printStackTrace();
-                    }
-                }
                 break;
         }
         // Before adding this resetAddInfo(), after a shortcut was added to a workspace screen,
@@ -1330,14 +1310,6 @@ public final class Launcher extends Activity
 
         // The folder info is not needed any more
         info.mFolderInfo = null;
-    }
-
-    private void completeLiveFolder(ComponentName receiver, long container, int screen, int cellX,
-            int cellY, String title) {
-        CellLayout layout = getCellLayout(container, screen);
-
-        FolderIcon liveFolder = addLiveFolder(receiver, layout, container, screen,
-                mPendingAddInfo.cellX, mPendingAddInfo.cellY, title);
     }
 
     /**
@@ -2064,22 +2036,6 @@ public final class Launcher extends Activity
         }
     }
 
-    void processLiveFolderFromDrop(ComponentName componentName, long container, int screen,
-            int[] cell, int[] loc) {
-        resetAddInfo();
-        mPendingAddInfo.container = container;
-        mPendingAddInfo.screen = screen;
-        mPendingAddInfo.dropPos = loc;
-        mPendingAddInfo.componentName = componentName;
-        if (cell != null) {
-            mPendingAddInfo.cellX = cell[0];
-            mPendingAddInfo.cellY = cell[1];
-        }
-
-        Intent createLiveFolderIntent = new Intent(LiveFolder.Constants.CREATE_LIVE_FOLDER);
-        createLiveFolderIntent.setComponent(componentName);
-        startActivityForResultSafely(createLiveFolderIntent, REQUEST_CREATE_LIVE_FOLDER);
-    }
 
     /**
      * Process a shortcut drop.
@@ -2187,38 +2143,6 @@ public final class Launcher extends Activity
         startActivityForResult(intent, REQUEST_PICK_WALLPAPER);
     }
 
-    FolderIcon addLiveFolder(ComponentName receiver, CellLayout layout, long container, final int screen, int cellX,
-            int cellY, String title) {
-        final LiveFolderInfo folderInfo = new LiveFolderInfo(title);
-        folderInfo.receiver = receiver;
-        // Update the model
-        LauncherModel.addItemToDatabase(Launcher.this, folderInfo, container, screen, cellX, cellY,
-                false);
-        sFolders.put(folderInfo.id, folderInfo);
-
-        // Create the view
-        FolderIcon newFolder =
-            FolderIcon.fromXml(R.layout.folder_icon, this, layout, folderInfo);
-        int x = cellX, y = cellY;
-        if (container == LauncherSettings.Favorites.CONTAINER_HOTSEAT) {
-            newFolder.setTextVisible(!mHideDockIconLabels);
-        } else {
-            newFolder.setTextVisible(!mHideIconLabels);
-        }
-
-        if (container == LauncherSettings.Favorites.CONTAINER_HOTSEAT &&
-            getHotseat().hasVerticalHotseat()) {
-            // Note: If the destination of the new folder is the hotseat and
-            // the hotseat is in vertical mode, then we need to invert the xy position,
-            // so the addInScreen method will use the correct values to draw the new folder
-            // in the correct position
-            // We use the y in both case to determine the new position
-            x = getHotseat().getInverterCellXFromOrder(y);
-            y = getHotseat().getInverterCellYFromOrder(y);
-        }
-        mWorkspace.addInScreen(newFolder, container, screen, x, y, 1, 1, isWorkspaceLocked());
-        return newFolder;
-    }
 
     FolderIcon addFolder(CellLayout layout, long container, final int screen, int cellX,
             int cellY) {
@@ -2256,9 +2180,6 @@ public final class Launcher extends Activity
 
     void removeFolder(FolderInfo folder) {
         sFolders.remove(folder.id);
-        if (folder instanceof LiveFolderInfo) {
-            LiveFoldersReceiver.alertFolderModified(this, (LiveFolderInfo) folder, true);
-        }
     }
 
     private void startWallpaper() {
@@ -4043,35 +3964,19 @@ public final class Launcher extends Activity
         mWorkspaceLoading = false;
 
         // Alert live folder receivers
-        HashMap<ComponentName, ArrayList<Long>> receivers =
-                new HashMap<ComponentName, ArrayList<Long>>();
-        for (FolderInfo i : getModel().sBgFolders.values()) {
-            if (i instanceof LiveFolderInfo) {
-                LiveFolderInfo info = (LiveFolderInfo) i;
-                ArrayList<Long> ids = null;
-                if (receivers.containsKey(info.receiver)) {
-                    ids = receivers.get(info.receiver);
-                } else {
-                    ids = new ArrayList<Long>(1);
-                }
-                ids.add(info.id);
-                receivers.put(info.receiver, ids);
-            }
-        }
-        Intent intent = new Intent(LiveFolder.Constants.LIVE_FOLDER_UPDATES);
-        intent.putExtra(LiveFolder.Constants.FOLDER_UPDATE_TYPE_EXTRA,
-                LiveFolder.Constants.EXISTING_FOLDERS_CREATED);
-        for (ComponentName receiver : receivers.keySet()) {
-            intent.setComponent(receiver);
-            ArrayList<Long> ids = receivers.get(receiver);
-            long[] receiverIds = new long[ids.size()];
-            for (int i = 0; i < ids.size(); i++) {
-                receiverIds[i] = ids.get(i);
-            }
-            intent.putExtra(LiveFolder.Constants.EXISTING_FOLDER_IDS_EXTRA,
-                    receiverIds);
-            sendBroadcastAsUser(intent, UserHandle.CURRENT_OR_SELF);
-        }
+//        HashMap<ComponentName, ArrayList<Long>> receivers =
+//                new HashMap<ComponentName, ArrayList<Long>>();
+//        for (ComponentName receiver : receivers.keySet()) {
+//            intent.setComponent(receiver);
+//            ArrayList<Long> ids = receivers.get(receiver);
+//            long[] receiverIds = new long[ids.size()];
+//            for (int i = 0; i < ids.size(); i++) {
+//                receiverIds[i] = ids.get(i);
+//            }
+//            intent.putExtra(LiveFolder.Constants.EXISTING_FOLDER_IDS_EXTRA,
+//                    receiverIds);
+//            sendBroadcastAsUser(intent, UserHandle.CURRENT_OR_SELF);
+//        }
     }
 
     private boolean canRunNewAppsAnimation() {
@@ -4491,27 +4396,18 @@ public final class Launcher extends Activity
             removeCling(R.id.all_apps_sort_cling);
         }
     }
-    public Cling showFirstRunFoldersCling(boolean isLiveFolder) {
+    public Cling showFirstRunFoldersCling() {
         String key = null;
-        if (isLiveFolder) {
-            key = Cling.LIVE_FOLDER_CLING_DISMISSED_KEY;
-        } else {
-            key = Cling.FOLDER_CLING_DISMISSED_KEY;
-        }
+        key = Cling.FOLDER_CLING_DISMISSED_KEY;
         // Enable the clings only if they have not been dismissed before
         if (isClingsEnabled() &&
                 !mSharedPrefs.getBoolean(key, false)) {
             Cling cling = initCling(R.id.folder_cling, null, true, 0);
-            cling.findViewById(R.id.cling_dismiss).setTag(isLiveFolder);
+            cling.findViewById(R.id.cling_dismiss).setTag(false);
             int titleRes = 0;
             int textRes = 0;
-            if (isLiveFolder) {
-                titleRes = R.string.live_folder_cling_title;
-                textRes = R.string.live_folder_cling_create_folder;
-            } else {
-                titleRes = R.string.folder_cling_title;
-                textRes = R.string.folder_cling_create_folder;
-            }
+            titleRes = R.string.folder_cling_title;
+            textRes = R.string.folder_cling_create_folder;
             ((TextView) cling.findViewById(R.id.folder_cling_title)).setText(titleRes);
             ((TextView) cling.findViewById(R.id.folder_cling_text)).setText(textRes);
             return cling;
@@ -4539,13 +4435,8 @@ public final class Launcher extends Activity
     public void dismissFolderCling(View v) {
         if (v != null && v.getTag() != null) {
             Cling cling = (Cling) findViewById(R.id.folder_cling);
-            Boolean isLiveFolder = (Boolean) v.getTag();
             String key = null;
-            if (isLiveFolder) {
-                key = Cling.LIVE_FOLDER_CLING_DISMISSED_KEY;
-            } else {
-                key = Cling.FOLDER_CLING_DISMISSED_KEY;
-            }
+            key = Cling.FOLDER_CLING_DISMISSED_KEY;
             dismissCling(cling, key, DISMISS_CLING_DURATION);
         }
     }

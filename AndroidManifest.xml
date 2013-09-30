@@ -114,13 +114,6 @@
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name="com.cyanogenmod.trebuchet.LiveFoldersReceiver">
-            <intent-filter>
-                <action android:name="cyanogenmod.intent.action.UPDATE_LIVE_FOLDER" />
-            </intent-filter>
-        </receiver>
-
         <activity android:name="com.cyanogenmod.trebuchet.preference.Preferences"
             android:label="@string/preferences_title">
             <intent-filter>

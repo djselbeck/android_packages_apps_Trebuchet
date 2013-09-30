@@ -587,10 +587,6 @@ public class LauncherModel extends BroadcastReceiver {
                     folderInfo.cellY = c.getInt(cellYIndex);
                 }
 
-                if (folderInfo instanceof LiveFolderInfo) {
-                    LiveFolderInfo info = (LiveFolderInfo) folderInfo;
-                    info.receiver = ComponentName.unflattenFromString(c.getString(receiverPackageIndex));
-                }
 
                 return folderInfo;
             }
@@ -655,9 +651,6 @@ public class LauncherModel extends BroadcastReceiver {
                         case LauncherSettings.Favorites.ITEM_TYPE_LIVE_FOLDER:
                         case LauncherSettings.Favorites.ITEM_TYPE_FOLDER:
                             sBgFolders.put(item.id, (FolderInfo) item);
-                            if (item instanceof LiveFolderInfo) {
-                                LiveFoldersReceiver.alertFolderModified(context, (LiveFolderInfo) item, false);
-                            }
                             // Fall through
                         case LauncherSettings.Favorites.ITEM_TYPE_APPLICATION:
                         case LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT:
@@ -1477,10 +1470,6 @@ public class LauncherModel extends BroadcastReceiver {
                                 folderInfo.cellX = c.getInt(cellXIndex);
                                 folderInfo.cellY = c.getInt(cellYIndex);
 
-                                if (folderInfo instanceof LiveFolderInfo) {
-                                    LiveFolderInfo fInfo = (LiveFolderInfo) folderInfo;
-                                    fInfo.receiver = ComponentName.unflattenFromString(c.getString(receiverPackageIndex));
-                                }
 
                                 // check & update map of what's occupied
                                 if (!checkItemPlacement(occupied, folderInfo)) {
@@ -1752,7 +1741,7 @@ public class LauncherModel extends BroadcastReceiver {
                             }
                         }
 
-                        if (folder.contents.size() == 1 && !(folder instanceof LiveFolderInfo)) {
+                        if (folder.contents.size() == 1) {
                             ShortcutInfo finalItem = folder.contents.get(0);
                             finalItem.container = folder.container;
                             LauncherModel.deleteItemFromDatabase(mContext, folder);
@@ -1761,7 +1750,7 @@ public class LauncherModel extends BroadcastReceiver {
                             workspaceItems.remove(i);
                             workspaceItems.add(finalItem);
                             folders.remove(Long.valueOf(item.id));
-                        } else if (folder.contents.size() == 0  && !(folder instanceof LiveFolderInfo)) {
+                        } else if (folder.contents.size() == 0) {
                             LauncherModel.deleteFolderContentsFromDatabase(mContext, folder);
                             workspaceItems.remove(i);
                             folders.remove(Long.valueOf(item.id));
@@ -2599,11 +2588,8 @@ public class LauncherModel extends BroadcastReceiver {
         FolderInfo folderInfo = folders.get(id);
         if (folderInfo == null) {
             // No placeholder -- create a new instance
-            if (folderType == LauncherSettings.Favorites.ITEM_TYPE_LIVE_FOLDER) {
-                folderInfo = new LiveFolderInfo();
-            } else {
+
                 folderInfo = new FolderInfo();
-            }
             folders.put(id, folderInfo);
         }
         return folderInfo;
